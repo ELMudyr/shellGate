@@ -27,3 +27,21 @@ You can check out the [create-t3-app GitHub repository](https://github.com/t3-os
 ## How do I deploy this?
 
 Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+
+## Simple Credentials Authentication
+
+- Add the following variables to your `.env` file:
+
+```
+AUTH_SECRET=your-random-secret
+AUTH_USERNAME=yourusername
+AUTH_PASSWORD=yourpassword
+```
+
+- Start the app and visit `/sign-in`. All routes are protected by middleware; unauthenticated users are redirected to `/sign-in`.
+- Click "Sign Out" in the header to end the session.
+
+Notes:
+
+- Discord OAuth remains available if configured, but is optional.
+- The credentials provider validates against the env variables only (no database) for now.
