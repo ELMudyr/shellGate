@@ -48,7 +48,9 @@ const handler = (req: NextApiRequest, res: NextApiResponse) => {
         "ssh:start",
         async (
           params: SSHConnectionParams,
-          ack?: (res: { ok: true; id: string } | { ok: false; error: string }) => void,
+          ack?: (
+            res: { ok: true; id: string } | { ok: false; error: string },
+          ) => void,
         ) => {
           try {
             const { id, promise } = createConnection(params);
@@ -82,12 +84,15 @@ const handler = (req: NextApiRequest, res: NextApiResponse) => {
         } catch {}
       });
 
-      socket.on("ssh:resize", ({ cols, rows }: { cols: number; rows: number }) => {
-        if (!sshId) return;
-        try {
-          resize(sshId, cols, rows);
-        } catch {}
-      });
+      socket.on(
+        "ssh:resize",
+        ({ cols, rows }: { cols: number; rows: number }) => {
+          if (!sshId) return;
+          try {
+            resize(sshId, cols, rows);
+          } catch {}
+        },
+      );
 
       socket.on("ssh:close", () => {
         if (!sshId) return;

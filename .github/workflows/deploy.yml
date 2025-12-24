@@ -2,7 +2,7 @@ name: Build and Deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch: {}
 
 permissions:
@@ -63,9 +63,13 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
-          port: ${{ secrets.VM_SSH_PORT || 22 }}
+          password: ${{ secrets.VM_PASSWORD }}
+          passphrase: ${{ secrets.VM_SSH_PASSPHRASE }}
+          port: ${{ secrets.VM_SSH_PORT }}
           source: "docker-compose.prod.yml"
           target: "${{ env.DEPLOY_DIR }}"
+          timeout: 60s
+          debug: true
 
       - name: Deploy on VM
         uses: appleboy/ssh-action@v1.2.0
@@ -73,7 +77,9 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
-          port: ${{ secrets.VM_SSH_PORT || 22 }}
+          password: ${{ secrets.VM_PASSWORD }}
+          passphrase: ${{ secrets.VM_SSH_PASSPHRASE }}
+          port: ${{ secrets.VM_SSH_PORT }}
           script: |
             set -e
             sudo mkdir -p ${{ env.DEPLOY_DIR }}

@@ -90,7 +90,9 @@ export default function SSHPage() {
       term.dispose();
       termRef.current = null;
       if (containerRef.current) {
-        containerRef.current.removeEventListener("mousedown", () => term.focus());
+        containerRef.current.removeEventListener("mousedown", () =>
+          term.focus(),
+        );
       }
     };
   }, []);
