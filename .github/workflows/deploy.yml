@@ -57,6 +57,40 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preflight validations
+        run: |
+          set -e
+          echo "Validating required secrets and files..."
+          if [ -z "${{ secrets.VM_HOST }}" ] || [ -z "${{ secrets.VM_USER }}" ]; then
+            echo "VM_HOST or VM_USER is missing in repo secrets" >&2
+            exit 1
+          fi
+          if [ -z "${{ secrets.VM_SSH_KEY }}" ] && [ -z "${{ secrets.VM_PASSWORD }}" ]; then
+            echo "Provide either VM_SSH_KEY (private key) or VM_PASSWORD in repo secrets" >&2
+            exit 1
+          fi
+          if [ ! -f ./docker-compose.prod.yml ]; then
+            echo "docker-compose.prod.yml not found at repo root" >&2
+            exit 1
+          fi
+
+      - name: Prepare deploy directory on VM
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          password: ${{ secrets.VM_PASSWORD }}
+          passphrase: ${{ secrets.VM_SSH_PASSPHRASE }}
+          port: ${{ secrets.VM_SSH_PORT }}
+          script: |
+            set -e
+            mkdir -p "${{ env.DEPLOY_DIR }}"
+            echo "Deploy directory prepared: ${{ env.DEPLOY_DIR }}"
+
       - name: Copy compose file to VM
         uses: appleboy/scp-action@v0.1.7
         with:
