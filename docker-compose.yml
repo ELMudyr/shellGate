@@ -1,0 +1,27 @@
+version: "3.9"
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: shellgate:latest
+    container_name: shellgate
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Ensure Next listens on 0.0.0.0 and correct port
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
+      # NextAuth and app env vars (override in your .env file if using env_file)
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NODE_ENV=production
+    env_file:
+      - ./.env
+    # Uncomment to set resource limits
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1.0'
+    #       memory: 512M

@@ -59,6 +59,19 @@ export default function SSHPage() {
     if (containerRef.current) {
       term.open(containerRef.current);
       fit.fit();
+      // Keep terminal focused when interacting inside
+      const focusTerm = () => term.focus();
+      containerRef.current.addEventListener("mousedown", focusTerm);
+      // Swallow keys like Escape so they don't bubble to page UI
+      term.attachCustomKeyEventHandler((ev) => {
+        // Keep keys within terminal when focused
+        ev.stopPropagation();
+        if (ev.key === "Escape") {
+          // Prevent global handlers from reacting to Escape
+          ev.preventDefault();
+        }
+        return true; // always let xterm handle the key
+      });
     }
 
     const onResize = () => {
@@ -76,6 +89,9 @@ export default function SSHPage() {
       window.removeEventListener("resize", onResize);
       term.dispose();
       termRef.current = null;
+      if (containerRef.current) {
+        containerRef.current.removeEventListener("mousedown", () => term.focus());
+      }
     };
   }, []);
 
