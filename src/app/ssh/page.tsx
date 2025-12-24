@@ -187,13 +187,13 @@ export default function SSHPage() {
         "ssh:start",
         { host, port, username, password },
         (ack: { ok: true; id: string } | { ok: false; error: string }) => {
-          if ((ack as any).ok !== true) {
-            const msg = (ack as { ok: false; error: string }).error ?? "Failed";
+          if ("ok" in ack && ack.ok === true) {
+            setConnectedId(ack.id);
+          } else {
+            const msg = "error" in ack ? ack.error : "Failed";
             toast.error(msg);
             s.disconnect();
-            return;
           }
-          setConnectedId((ack as { ok: true; id: string }).id);
         },
       );
     });

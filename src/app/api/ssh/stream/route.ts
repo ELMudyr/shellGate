@@ -3,6 +3,7 @@ import { auth } from "~/server/auth";
 import { subscribe, unsubscribe } from "~/server/ssh/manager";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const session = await auth();

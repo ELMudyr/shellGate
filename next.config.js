@@ -7,6 +7,12 @@ import "./src/env.js";
 /** @type {import("next").NextConfig} */
 const config = {
 	output: "standalone",
+	webpack: (config, { isServer }) => {
+		if (isServer) {
+			config.externals = [...(config.externals || []), "ssh2"];
+		}
+		return config;
+	},
 };
 
 export default config;

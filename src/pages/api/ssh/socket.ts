@@ -26,7 +26,13 @@ function parseSSE(chunk: string): { type: string; data: string } {
 }
 
 const handler = (req: NextApiRequest, res: NextApiResponse) => {
-  const srv = res.socket.server as unknown as WithIO;
+  const sock = res.socket as unknown as { server?: WithIO } | null;
+  const server = sock?.server;
+  if (!server) {
+    res.status(500).end("Server socket unavailable");
+    return;
+  }
+  const srv = server;
   if (!srv.io) {
     const io = new IOServer(srv, {
       path: "/socket.io",

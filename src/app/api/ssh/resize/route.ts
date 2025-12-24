@@ -3,6 +3,7 @@ import { auth } from "~/server/auth";
 import { resize } from "~/server/ssh/manager";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
