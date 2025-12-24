@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Label } from "~/components/ui/label";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
+import { io, type Socket } from "socket.io-client";
+import { toast } from "~/components/ui/toaster";
 
 export default function SSHPage() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -20,7 +22,7 @@ export default function SSHPage() {
   const inputQueueRef = useRef<string>("");
   const inputSendingRef = useRef<boolean>(false);
   const [connectedId, setConnectedId] = useState<string | null>(null);
-  const [evtSrc, setEvtSrc] = useState<EventSource | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   const [host, setHost] = useState("");
   const [port, setPort] = useState<number | undefined>(22);
@@ -59,7 +61,16 @@ export default function SSHPage() {
       fit.fit();
     }
 
-    const onResize = () => fitRef.current?.fit();
+    const onResize = () => {
+      fitRef.current?.fit();
+      const s = socketRef.current;
+      if (s && connectedId && termRef.current) {
+        s.emit("ssh:resize", {
+          cols: termRef.current.cols,
+          rows: termRef.current.rows,
+        });
+      }
+    };
     window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("resize", onResize);
@@ -70,18 +81,14 @@ export default function SSHPage() {
 
   useEffect(() => {
     if (!connectedId || !termRef.current || !fitRef.current) return;
-    // Ensure terminal is focused and fitted once connected
+    const s = socketRef.current;
+    if (!s) return;
+    // focus and fit, send initial size
     termRef.current.focus();
     fitRef.current.fit();
-    // Inform server of initial size
-    const dims =
-      termRef.current.cols && termRef.current.rows
-        ? { cols: termRef.current.cols, rows: termRef.current.rows }
-        : { cols: 80, rows: 24 };
-    void fetch(`/api/ssh/resize`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: connectedId, ...dims }),
+    s.emit("ssh:resize", {
+      cols: termRef.current.cols ?? 80,
+      rows: termRef.current.rows ?? 24,
     });
 
     const decodeBase64ToUtf8 = (b64: string) => {
@@ -98,52 +105,39 @@ export default function SSHPage() {
         rafIdRef.current = null;
       });
     };
-    const es = new EventSource(`/api/ssh/stream?id=${connectedId}`);
-    es.onmessage = (ev: MessageEvent) => {
-      const b64 = typeof ev.data === "string" ? ev.data : String(ev.data);
-      const text = decodeBase64ToUtf8(b64);
-      outputBufferRef.current += text;
-      scheduleFlush();
-    };
-    es.addEventListener("stderr", (ev: MessageEvent) => {
-      const b64 = typeof ev.data === "string" ? ev.data : String(ev.data);
-      const text = decodeBase64ToUtf8(b64);
-      outputBufferRef.current += text;
-      scheduleFlush();
-    });
-    es.addEventListener("close", () => {
-      termRef.current?.write("\r\n[Connection closed]\r\n");
-      es.close();
-      setEvtSrc(null);
-      setConnectedId(null);
-    });
-    setEvtSrc(es);
 
-    const flushInput = () => {
-      if (inputSendingRef.current) return;
-      const payload = inputQueueRef.current;
-      if (!payload) return;
-      inputSendingRef.current = true;
-      inputQueueRef.current = "";
-      void fetch(`/api/ssh/input`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: connectedId, data: payload }),
-        keepalive: true,
-      }).finally(() => {
-        inputSendingRef.current = false;
-        // send any buffered input immediately
-        flushInput();
-      });
+    const onStdout = (b64: string) => {
+      const text = decodeBase64ToUtf8(b64);
+      outputBufferRef.current += text;
+      scheduleFlush();
     };
+    const onStderr = (b64: string) => {
+      const text = decodeBase64ToUtf8(b64);
+      outputBufferRef.current += text;
+      scheduleFlush();
+    };
+    const onClose = () => {
+      termRef.current?.write("\r\n[Connection closed]\r\n");
+      setConnectedId(null);
+    };
+    s.on("ssh:data", onStdout);
+    s.on("ssh:stderr", onStderr);
+    s.on("ssh:close", onClose);
+    s.on("ssh:error", (b64: string) => {
+      const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const msg = decoderRef.current!.decode(bin);
+      toast.error(msg);
+    });
+
     const dispose = termRef.current.onData((d) => {
-      inputQueueRef.current += d;
-      flushInput();
+      s.emit("ssh:input", d);
     });
 
     return () => {
-      es.close();
-      setEvtSrc(null);
+      s.off("ssh:data", onStdout);
+      s.off("ssh:stderr", onStderr);
+      s.off("ssh:close", onClose);
+      s.off("ssh:error");
       dispose.dispose();
       if (rafIdRef.current != null) {
         window.cancelAnimationFrame(rafIdRef.current);
@@ -153,30 +147,47 @@ export default function SSHPage() {
   }, [connectedId]);
 
   const connect = async () => {
-    if (!host || !username) return;
-    const res = await fetch(`/api/ssh/start`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ host, port, username, password }),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      termRef.current?.write(`\r\n[Error] ${text}\r\n`);
+    if (!host || !username) {
+      toast.error("Please enter host and username");
       return;
     }
-    const json = (await res.json()) as { id: string };
-    setConnectedId(json.id);
+    try {
+      await fetch("/api/ssh/socket");
+    } catch {
+      // ignore
+    }
+    // cleanup any existing socket
+    if (socketRef.current) {
+      socketRef.current.removeAllListeners();
+      socketRef.current.disconnect();
+    }
+    const s = io({ transports: ["websocket"], path: "/socket.io" });
+    socketRef.current = s;
+    s.once("connect_error", (err) => {
+      toast.error(`Socket error: ${err.message}`);
+    });
+    s.once("connect", () => {
+      s.emit(
+        "ssh:start",
+        { host, port, username, password },
+        (ack: { ok: true; id: string } | { ok: false; error: string }) => {
+          if ((ack as any).ok !== true) {
+            const msg = (ack as { ok: false; error: string }).error ?? "Failed";
+            toast.error(msg);
+            s.disconnect();
+            return;
+          }
+          setConnectedId((ack as { ok: true; id: string }).id);
+        },
+      );
+    });
   };
 
   const disconnect = async () => {
     if (!connectedId) return;
-    await fetch(`/api/ssh/close`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: connectedId }),
-    });
-    evtSrc?.close();
-    setEvtSrc(null);
+    socketRef.current?.emit("ssh:close");
+    socketRef.current?.removeAllListeners();
+    socketRef.current?.disconnect();
     setConnectedId(null);
   };
 
@@ -217,7 +228,13 @@ export default function SSHPage() {
               <CardTitle>SSH Connection</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+              <form
+                className="grid grid-cols-1 gap-3 md:grid-cols-5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void connect();
+                }}
+              >
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="host">Host</Label>
                   <Input
@@ -254,10 +271,10 @@ export default function SSHPage() {
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
-              </div>
-              <div className="mt-3 flex items-center gap-2">
-                <Button onClick={connect}>Connect</Button>
-              </div>
+                <div className="mt-3 flex items-center gap-2 md:col-span-5">
+                  <Button type="submit">Connect</Button>
+                </div>
+              </form>
             </CardContent>
           </Card>
 

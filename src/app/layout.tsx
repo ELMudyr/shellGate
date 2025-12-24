@@ -10,6 +10,7 @@ import { TRPCReactProvider } from "~/trpc/react";
 import { auth, signOut } from "~/server/auth";
 // Removed desktop Sidebar; using hamburger/mobile menu only
 import { MobileMenu } from "~/components/ui/mobile-menu";
+import { Toaster } from "~/components/ui/toaster";
 
 // export const metadata: Metadata = {
 //   title: "Create T3 App",
@@ -39,6 +40,7 @@ export default async function RootLayout({
         <main className="flex-1">
           <TRPCReactProvider>{children}</TRPCReactProvider>
         </main>
+        <Toaster richColors position="top-right" theme="dark" />
       </body>
     </html>
   );
