@@ -70,7 +70,6 @@ jobs:
           target: "${{ env.DEPLOY_DIR }}"
           timeout: 60s
           debug: true
-
       - name: Deploy on VM
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -82,29 +81,17 @@ jobs:
           port: ${{ secrets.VM_SSH_PORT }}
           script: |
             set -e
-            sudo mkdir -p ${{ env.DEPLOY_DIR }}
-            sudo chown $USER:${USER} ${{ env.DEPLOY_DIR }} || true
             cd ${{ env.DEPLOY_DIR }}
-
-            # Create .env once and put your prod secrets there (NEXTAUTH_URL, NEXTAUTH_SECRET, ...)
             if [ ! -f .env ]; then
-              echo "⚠️  .env missing in $PWD. Create it with your runtime secrets before deploying." >&2
+              echo ".env missing in $PWD. Create it with your runtime secrets before deploying." >&2
               exit 1
             fi
-
-            # Option A: Make GHCR package public after first push and skip login
-            # Option B: If private, login using secrets (set GHCR_USERNAME and GHCR_PAT in repo secrets)
             if [ -n "${GHCR_USERNAME}" ] && [ -n "${GHCR_PAT}" ]; then
               echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
             fi
-
             export IMAGE="${{ needs.build.outputs.image }}:${{ needs.build.outputs.tag }}"
             docker pull "$IMAGE"
-
-            # Bring up the stack with the exact image the workflow built
             IMAGE="$IMAGE" docker compose -f docker-compose.prod.yml up -d
-
-            # Prune old images to save space
             docker image prune -f
         env:
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
