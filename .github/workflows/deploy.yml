@@ -66,7 +66,7 @@ jobs:
           password: ${{ secrets.VM_PASSWORD }}
           passphrase: ${{ secrets.VM_SSH_PASSPHRASE }}
           port: ${{ secrets.VM_SSH_PORT }}
-          source: "docker-compose.prod.yml"
+          source: "./docker-compose.prod.yml"
           target: "${{ env.DEPLOY_DIR }}"
           timeout: 60s
           debug: true
