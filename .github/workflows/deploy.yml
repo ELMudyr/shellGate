@@ -12,7 +12,7 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }} # owner/repo
-  DEPLOY_DIR: /opt/shellgate
+  DEPLOY_DIR: /home/elmudyr/shellgate
 
 jobs:
   build:
