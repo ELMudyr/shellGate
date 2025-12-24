@@ -76,9 +76,7 @@ export function createConnection(params: SSHConnectionParams): {
         );
       })
       .on("error", (err: Error) => {
-        const b64 = Buffer.from(String(err.message), "utf8").toString(
-          "base64",
-        );
+        const b64 = Buffer.from(String(err.message), "utf8").toString("base64");
         for (const sub of managed.subscribers)
           sub.enqueue(`event: error\ndata: ${b64}\n\n`);
         reject(new Error(err.message));

@@ -27,24 +27,25 @@ export default async function SignInPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Sign in</CardTitle>
-        </CardHeader>
+      <Card className="w-full max-w-sm bg-black/20 backdrop-blur-md">
         <CardContent>
           <form action={doSignIn} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
               <Input
                 id="username"
                 name="username"
-                placeholder="yourname"
+                placeholder="Username"
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" type="password" required />
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="Password"
+                required
+              />
             </div>
             <Button type="submit" className="w-full">
               Sign In

@@ -70,6 +70,8 @@ export default function SSHPage() {
 
   useEffect(() => {
     if (!connectedId || !termRef.current || !fitRef.current) return;
+    // Ensure terminal is focused and fitted once connected
+    termRef.current.focus();
     fitRef.current.fit();
     // Inform server of initial size
     const dims =
@@ -178,67 +180,121 @@ export default function SSHPage() {
     setConnectedId(null);
   };
 
+  const isConnected = !!connectedId;
+
   return (
-    <div className="space-y-4 p-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>SSH Connection</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="host">Host</Label>
-              <Input
-                id="host"
-                value={host}
-                onChange={(e) => setHost(e.target.value)}
-                placeholder="192.168.0.10"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="port">Port</Label>
-              <Input
-                id="port"
-                type="number"
-                value={port ?? 22}
-                onChange={(e) => setPort(Number(e.target.value))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="root"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <Button onClick={connect} disabled={!!connectedId}>
-              Connect
-            </Button>
-            <Button
-              onClick={disconnect}
-              variant="outline"
-              disabled={!connectedId}
-            >
+    <div className="mt-8 space-y-4 p-4">
+      {/* Status/Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm">
+          <span
+            className={`inline-block h-2 w-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}
+            aria-hidden
+          />
+          <span>
+            Status:{" "}
+            {isConnected
+              ? `Connected${host ? ` to ${host}${port ? `:${port}` : ""}` : ""}`
+              : "Disconnected"}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {!isConnected ? (
+            <div></div>
+          ) : (
+            <Button variant="outline" onClick={disconnect}>
               Disconnect
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          )}
+        </div>
+      </div>
 
-      <div className="rounded-lg border border-white/10">
+      {/* Connection form (hidden once connected) */}
+      {!isConnected && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>SSH Connection</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="host">Host</Label>
+                  <Input
+                    id="host"
+                    value={host}
+                    onChange={(e) => setHost(e.target.value)}
+                    placeholder="192.168.0.10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="port">Port</Label>
+                  <Input
+                    id="port"
+                    type="number"
+                    value={port ?? 22}
+                    onChange={(e) => setPort(Number(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="username">Username</Label>
+                  <Input
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="root"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <Button onClick={connect}>Connect</Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Favorites */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Favorites</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between rounded-md border border-white/10 p-3">
+                <div>
+                  <div className="text-sm font-medium">157.173.125.124</div>
+                  <div className="text-xs text-white/60">
+                    Click Use to prefill host
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setHost("157.173.125.124");
+                      setUsername("elmudyr");
+                    }}
+                  >
+                    Use
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* Terminal container: mounted always, hidden until connected */}
+      <div
+        className={`rounded-lg border border-white/10 ${isConnected ? "" : "hidden"}`}
+      >
         <div ref={containerRef} className="h-[60vh] p-2" />
       </div>
     </div>

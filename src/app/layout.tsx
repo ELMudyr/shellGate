@@ -1,4 +1,4 @@
-"use client";
+// Server Component layout (no client directive)
 
 import "~/styles/globals.css";
 
@@ -8,7 +8,8 @@ import Link from "next/link";
 
 import { TRPCReactProvider } from "~/trpc/react";
 import { auth, signOut } from "~/server/auth";
-import { Button } from "~/components/ui/button";
+// Removed desktop Sidebar; using hamburger/mobile menu only
+import { MobileMenu } from "~/components/ui/mobile-menu";
 
 // export const metadata: Metadata = {
 //   title: "Create T3 App",
@@ -22,7 +23,7 @@ const geist = Geist({
 });
 
 async function doSignOut() {
-  // "use server";
+  "use server";
   await signOut({ redirectTo: "/sign-in" });
 }
 
@@ -34,21 +35,10 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${geist.variable}`}>
       <body className="bg-neutral-950 text-white">
-        <header className="flex items-center justify-between border-b border-white/10 px-4 py-2">
-          <Link href="/" className="cursor-pointer text-sm font-semibold">
-            ShellGate
-          </Link>
-          <div>
-            {session?.user ? (
-              <form action={doSignOut}>
-                <Button type="submit" variant="outline">
-                  Sign Out
-                </Button>
-              </form>
-            ) : null}
-          </div>
-        </header>
-        <TRPCReactProvider>{children}</TRPCReactProvider>
+        <MobileMenu isAuthenticated={!!session?.user} onSignOut={doSignOut} />
+        <main className="flex-1">
+          <TRPCReactProvider>{children}</TRPCReactProvider>
+        </main>
       </body>
     </html>
   );
