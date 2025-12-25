@@ -1,4 +1,4 @@
-name: Build and Deploy
+name: Deploy to VM
 
 on:
   push:
@@ -7,54 +7,12 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }} # owner/repo
   DEPLOY_DIR: /home/elmudyr/shellgate
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=sha,format=long
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-    outputs:
-      image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-      tag: sha-${{ github.sha }}
-
   deploy:
-    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -72,8 +30,8 @@ jobs:
             echo "Provide either VM_SSH_KEY (private key) or VM_PASSWORD in repo secrets" >&2
             exit 1
           fi
-          if [ ! -f ./docker-compose.prod.yml ]; then
-            echo "docker-compose.prod.yml not found at repo root" >&2
+          if [ ! -f ./docker-compose.yml ]; then
+            echo "docker-compose.yml not found at repo root" >&2
             exit 1
           fi
 
@@ -91,7 +49,7 @@ jobs:
             mkdir -p "${{ env.DEPLOY_DIR }}"
             echo "Deploy directory prepared: ${{ env.DEPLOY_DIR }}"
 
-      - name: Copy compose file to VM
+      - name: Upload repository to VM
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VM_HOST }}
@@ -100,11 +58,12 @@ jobs:
           password: ${{ secrets.VM_PASSWORD }}
           passphrase: ${{ secrets.VM_SSH_PASSPHRASE }}
           port: ${{ secrets.VM_SSH_PORT }}
-          source: "./docker-compose.prod.yml"
+          source: "."
           target: "${{ env.DEPLOY_DIR }}"
-          timeout: 60s
+          timeout: 120s
           debug: true
-      - name: Deploy on VM
+
+      - name: Deploy on VM (docker compose build & up)
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VM_HOST }}
@@ -120,13 +79,10 @@ jobs:
               echo ".env missing in $PWD. Create it with your runtime secrets before deploying." >&2
               exit 1
             fi
-            if [ -n "${GHCR_USERNAME}" ] && [ -n "${GHCR_PAT}" ]; then
-              echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+            # Use Docker Compose plugin if available; fallback to docker-compose
+            if docker compose version >/dev/null 2>&1; then
+              docker compose -f docker-compose.yml up -d --build
+            else
+              docker-compose -f docker-compose.yml up -d --build
             fi
-            export IMAGE="${{ needs.build.outputs.image }}:${{ needs.build.outputs.tag }}"
-            docker pull "$IMAGE"
-            IMAGE="$IMAGE" docker compose -f docker-compose.prod.yml up -d
             docker image prune -f
-        env:
-          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-          GHCR_PAT: ${{ secrets.GHCR_PAT }}
